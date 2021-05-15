@@ -27,7 +27,11 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="IP_line"/>
+         <widget class="QLineEdit" name="IP_line">
+          <property name="text">
+           <string>192.168.1.2</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QLabel" name="label_5">
@@ -37,7 +41,11 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="Port_s_line"/>
+         <widget class="QLineEdit" name="Port_s_line">
+          <property name="text">
+           <string>8889</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QLabel" name="label_6">
@@ -47,7 +55,11 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="Port_r_line"/>
+         <widget class="QLineEdit" name="Port_r_line">
+          <property name="text">
+           <string>8888</string>
+          </property>
+         </widget>
         </item>
         <item>
          <spacer name="horizontalSpacer_2">
@@ -81,7 +93,11 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="Int_line"/>
+         <widget class="QLineEdit" name="Int_line">
+          <property name="text">
+           <string>100</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QLabel" name="label">
@@ -91,7 +107,11 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="Scan_line"/>
+         <widget class="QLineEdit" name="Scan_line">
+          <property name="text">
+           <string>100</string>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QLabel" name="label_2">
@@ -101,7 +121,11 @@
          </widget>
         </item>
         <item>
-         <widget class="QLineEdit" name="Sim_line"/>
+         <widget class="QLineEdit" name="Sim_line">
+          <property name="text">
+           <string>1000</string>
+          </property>
+         </widget>
         </item>
         <item>
          <spacer name="horizontalSpacer">
@@ -216,7 +240,7 @@
    <sender>Sim_line</sender>
    <signal>returnPressed()</signal>
    <receiver>MainWindow</receiver>
-   <slot>server_connect()</slot>
+   <slot>para_changed()</slot>
    <hints>
     <hint type="sourcelabel">
      <x>506</x>

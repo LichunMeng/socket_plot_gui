@@ -4,23 +4,64 @@ from PyQt5.QtGui import *
 import socket
 import struct
 from PyQt5.QtWidgets import *
-import atexit
+
+import time
+import traceback, sys
 from design import *
 import sys
 from pqueue import Queue
+
+
+class Worker(QRunnable):
+    '''
+    Worker thread
+
+    Inherits from QRunnable to handler worker thread setup, signals and wrap-up.
+
+    :param callback: The function callback to run on this worker thread. Supplied args and
+                     kwargs will be passed through to the runner.
+    :type callback: function
+    :param args: Arguments to pass to the callback function
+    :param kwargs: Keywords to pass to the callback function
+
+    '''
+
+    def __init__(self, fn, *args, **kwargs):
+        super(Worker, self).__init__()
+
+        # Store constructor arguments (re-used for processing)
+        self.fn = fn
+        self.args = args
+        self.kwargs = kwargs
+
+        # Add the callback to our kwargs
+
+    @pyqtSlot()
+    def run(self):
+        '''
+        Initialise the runner function with passed args, kwargs.
+        '''
+
+        # Retrieve args/kwargs here; and fire processing using them
+        try:
+            result = self.fn(*self.args, **self.kwargs)
+        except:
+            return 0
+
 class MyApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.ui=Ui_MainWindow()
         self.ui.setupUi(self)
-        self.Ctl_timer = QTimer()
-        self.Ctl_timer.setSingleShot(True)
-        self.Ctl_timer.setInterval(50)
-        self.Ctl_timer.timeout.connect(self.Ctl_loop)
-        self.Ctl_timer.start()
+
+        #self.Ctl_timer = QTimer()
+        ##self.Ctl_timer.setSingleShot(True)
+        #self.Ctl_timer.setInterval(70)
+        #self.Ctl_timer.timeout.connect(self.Ctl_loop)
+        #self.Ctl_timer.start()
         
         self.N=1024*8
-        self.fmt_r='I'*self.N*2
+        self.fmt_r='Q'*self.N
 
         self.ip="192.168.1.2"
         self.port_s=8889
@@ -34,9 +75,11 @@ class MyApp(QMainWindow):
         self._socket_t = None
         self._unit_connected_to = None
         self._unit_connected= False
+        self.q=Queue('tmp',maxsize=self.N*2)
         self.para_changed() 
+        self.threadpool = QThreadPool()
 
-        self.line,=self.ui.widget.canvas.ax.plot([1],[1],'r.',markersize=0.1)
+        self.line,=self.ui.widget.canvas.ax.plot([1],[1],'b.',markersize=0.3)
         self.ui.widget.canvas.ax.set_ylim(-1,1)
         self.ui.widget.canvas.ax.set_xlim(0,100)
 
@@ -51,6 +94,8 @@ class MyApp(QMainWindow):
         self.Sim=int(int(self.ui.Sim_line.text())/20)
         if self._unit_connected:
             self.Pls_control()
+    
+        
 
     def Pls_control(self):
         i=0
@@ -97,15 +142,24 @@ class MyApp(QMainWindow):
                 self._unit_connected_to =False
                 self._unit_connected =False 
 
-                self.ui.statusbar.showMessage(ex.message)
+                self.ui.statusbar.showMessage(str(ex))
                 #self.ui.statusbar.showMessage(f"server connect error!")
                 self.ui.IP_line.setEnabled(True)
                 self.ui.Port_s_line.setEnabled(True)
                 self.ui.Port_r_line.setEnabled(True)
                 self.ui.Connect_button.setText("Connect")
+            worker_recv = Worker(self.Ctl_loop) # Any other args, kwargs are passed to the run function
+            worker_plot = Worker(self.plot_loop) # Any other args, kwargs are passed to the run function
+            #worker.signals.result.connect(self.print_output)
+            #worker.signals.finished.connect(self.thread_complete)
+            #worker.signals.progress.connect(self.progress_fn)
+            self.threadpool.start(worker_recv)
+            self.threadpool.start(worker_plot)
         else:
             self.counter=0
-            self._socket_r.close()  # instantiate
+            self.threadpool.releaseThread()
+            self.threadpool.releaseThread()
+            #self._socket_r.close()  # instantiate
             #self._socket_s.close()  # instantiate
             self.ui.IP_line.setEnabled(True)
             self.ui.Port_s_line.setEnabled(True)
@@ -114,6 +168,36 @@ class MyApp(QMainWindow):
             self._unit_connected_to = False
             self._unit_connected = False 
             self.ui.statusbar.showMessage(f"server disconnectted")
+
+    def plot_loop(self):
+        si=2147483648;
+        while self._unit_connected:
+            while self._unit_connected & (self.q.qsize()>1):
+                x=[]
+                y=[]
+                tmp=1
+                while tmp<=si:
+                    try:
+                        raw=self.q.get_nowait()
+                    except Exception as e:
+                    ar=struct.unpack('II',struct.pack('Q',raw))
+                    x_tmp=ar[0]
+                    tmp=ar[1]
+                    x.append(x_tmp)
+                    y.append(tmp)
+                y[-1]=y[-1]-si
+                x=np.array(x)*20e-6
+                self.ui.widget.canvas.ax.set_ylim(0,np.mean(y)*1.2)
+                self.ui.widget.canvas.ax.set_xlim(0,self.Scan*20e-6)
+                self.line.set_ydata(y)
+                self.line.set_xdata(x)
+                self.ui.widget.canvas.draw()
+                time.sleep((self.Scan*20e-9)*0.5)
+                self.ui.widget.canvas.flush_events()
+                self.ui.statusbar.showMessage(f"data plotting, "+str(self.counter))
+                self.counter=self.counter+1
+
+        #self.Plot_timer.start()
 
     def Ctl_loop(self):
         while self._unit_connected:
@@ -127,10 +211,13 @@ class MyApp(QMainWindow):
                 data_raw = self._socket_r.recv(8*self.N,socket.MSG_WAITALL)  # receive response
             self.ui.statusbar.showMessage(f"data received")
             data=struct.unpack(self.fmt_r,data_raw)
-            self.plot_data(data)
+            #self.plot_data(data)
+            try:
+                list(map(self.q.put_nowait,data))
+            except:
             self._socket_r.close()
             self._unit_connected_to=False
-        self.Ctl_timer.start()
+        #self.Ctl_timer.start()
         
     def plot_data(self,data):
         si=2147483648;
@@ -174,4 +261,10 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     form = MyApp()
     form.show()
-    sys.exit(app.exec_())
+    ret=app.exec_()
+    if form._unit_connected:
+        form.server_connect()
+
+    sys.exit(ret)
+    
+    
