@@ -4,7 +4,8 @@ from PyQt5.QtGui import *
 import socket
 import struct
 from PyQt5.QtWidgets import *
-
+import os 
+import shutil
 import time
 import traceback, sys
 from design import *
@@ -76,6 +77,7 @@ class MyApp(QMainWindow):
         self._unit_connected_to = None
         self._unit_connected= False
         self.q=Queue('tmp',maxsize=self.N*2)
+        #self.q=Queue('tmp')
         self.para_changed() 
         self.threadpool = QThreadPool()
 
@@ -180,6 +182,7 @@ class MyApp(QMainWindow):
                     try:
                         raw=self.q.get_nowait()
                     except Exception as e:
+                        self.ui.statusbar.showMessage(str(e))
                     ar=struct.unpack('II',struct.pack('Q',raw))
                     x_tmp=ar[0]
                     tmp=ar[1]
@@ -214,7 +217,8 @@ class MyApp(QMainWindow):
             #self.plot_data(data)
             try:
                 list(map(self.q.put_nowait,data))
-            except:
+            except Exception as e:
+                self.ui.statusbar.showMessage(str(e))
             self._socket_r.close()
             self._unit_connected_to=False
         #self.Ctl_timer.start()
@@ -264,6 +268,8 @@ if __name__ == "__main__":
     ret=app.exec_()
     if form._unit_connected:
         form.server_connect()
+   #     os.remove("./tmp/*")     
+    shutil.rmtree('tmp')
 
     sys.exit(ret)
     
